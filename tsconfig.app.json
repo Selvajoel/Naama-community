@@ -1,0 +1,395 @@
+import { useState, useEffect } from 'react';
+import { Building, MapPin, Users, FileText, Phone, Mail } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
+import { useRouter } from '../components/Router';
+
+const TAMIL_NADU_DISTRICTS = [
+  'Ariyalur', 'Chengalpattu', 'Chennai', 'Coimbatore', 'Cuddalore',
+  'Dharmapuri', 'Dindigul', 'Erode', 'Kallakurichi', 'Kanchipuram',
+  'Kanyakumari', 'Karur', 'Krishnagiri', 'Madurai', 'Nagapattinam',
+  'Namakkal', 'Nilgiris', 'Perambalur', 'Pudukkottai', 'Ramanathapuram',
+  'Ranipet', 'Salem', 'Sivaganga', 'Tenkasi', 'Thanjavur',
+  'Theni', 'Thoothukudi', 'Tiruchirappalli', 'Tirunelveli', 'Tirupathur',
+  'Tiruppur', 'Tiruvallur', 'Tiruvannamalai', 'Tiruvarur', 'Vellore',
+  'Viluppuram', 'Virudhunagar'
+];
+
+export function RegisterOrphanage() {
+  const { user, profile, refreshProfile } = useAuth();
+  const { navigate } = useRouter();
+  const [existingOrphanage, setExistingOrphanage] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    address: '',
+    city: '',
+    district: '',
+    capacity: '',
+    contact_person: '',
+    contact_email: '',
+    contact_phone: '',
+    description: '',
+    current_needs: '',
+  });
+
+  useEffect(() => {
+    checkExistingOrphanage();
+  }, [user]);
+
+  const checkExistingOrphanage = async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    const { data } = await supabase
+      .from('orphanages')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (data) {
+      setExistingOrphanage(data);
+    }
+    setLoading(false);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user || !profile) {
+      navigate('/signin');
+      return;
+    }
+
+    if (profile.user_type !== 'orphanage') {
+      alert('Only orphanage accounts can register orphanages');
+      return;
+    }
+
+    setSubmitting(true);
+
+    const orphanageData = {
+      user_id: user.id,
+      name: formData.name,
+      address: formData.address,
+      city: formData.city,
+      district: formData.district,
+      capacity: parseInt(formData.capacity),
+      contact_person: formData.contact_person,
+      contact_email: formData.contact_email,
+      contact_phone: formData.contact_phone,
+      description: formData.description || null,
+      current_needs: formData.current_needs || null,
+      verification_status: 'pending',
+    };
+
+    const { error } = await supabase
+      .from('orphanages')
+      .insert(orphanageData);
+
+    setSubmitting(false);
+
+    if (error) {
+      alert('Error registering orphanage: ' + error.message);
+    } else {
+      alert('Orphanage registered successfully! Your application is pending approval.');
+      navigate('/dashboard');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-16 bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block w-12 h-12 border-4 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || !profile) {
+    return (
+      <div className="min-h-screen pt-16 bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md mx-auto text-center px-4">
+          <Building className="h-16 w-16 text-green-600 mx-auto mb-6" />
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Sign In Required</h2>
+          <p className="text-gray-600 mb-8">
+            Please sign in with an orphanage account to register
+          </p>
+          <button
+            onClick={() => navigate('/signin')}
+            className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all font-semibold"
+          >
+            Sign In
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (profile.user_type !== 'orphanage') {
+    return (
+      <div className="min-h-screen pt-16 bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md mx-auto text-center px-4">
+          <Building className="h-16 w-16 text-orange-600 mx-auto mb-6" />
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Orphanage Account Required</h2>
+          <p className="text-gray-600">
+            You need an orphanage account to register an orphanage. Donor accounts cannot register.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (existingOrphanage) {
+    return (
+      <div className="min-h-screen pt-16 bg-gray-50 flex items-center justify-center px-4">
+        <div className="max-w-md mx-auto text-center">
+          <div className="bg-white rounded-2xl shadow-lg p-8">
+            <Building className="h-16 w-16 text-green-600 mx-auto mb-6" />
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Already Registered</h2>
+            <p className="text-gray-600 mb-2">
+              <strong>{existingOrphanage.name}</strong>
+            </p>
+            <p className="text-sm text-gray-500 mb-6">
+              Status: <span className={`font-semibold ${
+                existingOrphanage.verification_status === 'approved' ? 'text-green-600' :
+                existingOrphanage.verification_status === 'rejected' ? 'text-red-600' :
+                'text-orange-600'
+              }`}>
+                {existingOrphanage.verification_status.charAt(0).toUpperCase() + existingOrphanage.verification_status.slice(1)}
+              </span>
+            </p>
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all font-semibold"
+            >
+              Go to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen pt-16 bg-gray-50">
+      <section className="bg-gradient-to-br from-green-50 via-white to-orange-50 py-16 px-4">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="inline-flex items-center space-x-2 bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-medium mb-6">
+            <Building className="h-4 w-4" />
+            <span>Orphanage Registration</span>
+          </div>
+
+          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
+            Register Your Orphanage
+          </h1>
+
+          <p className="text-xl text-gray-600">
+            Join our network of verified orphanages and connect with generous donors
+          </p>
+        </div>
+      </section>
+
+      <section className="py-12">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white rounded-2xl shadow-lg p-8">
+            <form onSubmit={handleSubmit} className="space-y-8">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                  <Building className="h-6 w-6 mr-2 text-green-600" />
+                  Basic Information
+                </h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Orphanage Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none transition-colors"
+                      placeholder="Full name of the orphanage"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <MapPin className="inline h-4 w-4 mr-1" />
+                      Address <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none transition-colors"
+                      placeholder="Street address"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      City <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none transition-colors"
+                      placeholder="City"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      District <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      required
+                      value={formData.district}
+                      onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none transition-colors"
+                    >
+                      <option value="">Select District</option>
+                      {TAMIL_NADU_DISTRICTS.map(district => (
+                        <option key={district} value={district}>{district}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <Users className="inline h-4 w-4 mr-1" />
+                      Number of Children <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={formData.capacity}
+                      onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none transition-colors"
+                      placeholder="Capacity"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                  <Phone className="h-6 w-6 mr-2 text-green-600" />
+                  Contact Information
+                </h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Contact Person <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.contact_person}
+                      onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none transition-colors"
+                      placeholder="Primary contact name"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <Mail className="inline h-4 w-4 mr-1" />
+                      Email <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={formData.contact_email}
+                      onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none transition-colors"
+                      placeholder="contact@orphanage.org"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      <Phone className="inline h-4 w-4 mr-1" />
+                      Phone <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={formData.contact_phone}
+                      onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none transition-colors"
+                      placeholder="+91 98765 43210"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                  <FileText className="h-6 w-6 mr-2 text-green-600" />
+                  Additional Information
+                </h2>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      About Your Orphanage
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none transition-colors resize-none"
+                      placeholder="Brief description of your orphanage, mission, and activities..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Current Needs
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={formData.current_needs}
+                      onChange={(e) => setFormData({ ...formData, current_needs: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none transition-colors resize-none"
+                      placeholder="List your current food and supply needs..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <p className="text-sm text-blue-900">
+                  <strong>Note:</strong> Your orphanage will be reviewed by our team before being approved.
+                  This helps us ensure all organizations on our platform are legitimate and trustworthy.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full px-6 py-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? 'Submitting...' : 'Submit for Review'}
+              </button>
+            </form>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
